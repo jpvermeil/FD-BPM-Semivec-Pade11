@@ -1,13 +1,12 @@
-function [Px,glob_adr_slgs,dim_xl,dim_yl] = FD_BPM_Pade11_Semivec_vec_(n,lambda,n_eff_Px,n_eff_Py,alpha,solver_tol,xg,yg,dz,Nb_interpolation,POLARIZATION,FIELDCOMPONENTS,BC)
-
+function [Px,glob_adr_slgs,dim_xl,dim_yl] = FD_BPM_Pade11_Semivec_vec_(n,lambda,n_eff_Px,n_eff_Py,alpha,solver_tol,xg,yg,dz,EXCITATION,POLARIZATION,FIELDCOMPONENTS,BC,ABSORBER)
 % BPM zur Bestimmung von E- oder H-Feldern. Bestimmung erfolgt 
 % komponentenweise. Die Polarisation kann mit POLARIZATION (String) 
 % ausgewählt werden und kann zu 'TE' oder 'TM' gesetzt werden.
-% Nb_interpolation setzt die ver-2^Nb_interpolationsfacht das
+% nb_interpolation setzt die ver-2^nb_interpolationsfacht das
 % Brechzahlprofil in beide Richtungen vor der Bestimmung der
 % Ausbreitungskonstanten. 
 
-%% Wide angle Pade(3,3) FD BPM for E- and H fields
+%% Wide angle Pade(1,1) FD BPM for E- and/or H-fields
 
 format long
 
@@ -15,6 +14,9 @@ format long
 
 beta_0 = 2*pi/lambda;
 beta_z = beta_0 * n_eff_Px;
+n_max = max(max(squeeze(n(:,:,1))));
+n_min = min(min(squeeze(n(:,:,1))));
+delta_n = n_max - n_min;
 
 % Feldkomponenten werden überprüft und festgelegt
 
@@ -44,52 +46,111 @@ dG.cg(1:end) = 1:1:length(dG.cg(1:end));
 glob_adr_slgs   = dG.cg(2:end-1,2:end-1);
 glob_adr_slgs   = reshape(glob_adr_slgs,size(glob_adr_slgs,1)*size(glob_adr_slgs,2),1);
      
-%% Interpolation des Brechzahlprofils zur Bestimmung der Ausbreitungskonstanten und des Grundmodenfeldes
+%% Berechnung der Anfangswerte der Felder in Abhängigkeit der gewählten Anregungsform
 
-ni = interpn(squeeze(n(:,:,1)),Nb_interpolation);    % ver-Nb_interpolation-fachung des Brechzahlprofils
+excitation = EXCITATION.fieldtype;
+visualize_excitation = EXCITATION.visualize;
 
-%% Bestimmung der Ausbreitungskonstanten und des Grundmodenfeldes
+if strcmp(excitation,'gauss')
+    
+    sigma_x = EXCITATION.sigma_x;
+    sigma_y = EXCITATION.sigma_y;
+    
+    if isnumeric(sigma_x) && isnumeric(sigma_y)
 
-[~,Modenfeld_Px] = FD_propagationconstants_Semivec_(ni,beta_0,xg(:,:,1),yg(:,:,1),dim_y,dim_xl,dim_yl,dG.cg,dG.cl,POLARIZATION,FX,1); 
-%[~,Modenfeld_Py] = FD_propagationconstants_Semivec_(ni,beta_0,xg(:,:,1),yg(:,:,1),dim_y,dim_xl,dim_yl,dG.cg,dG.cl,POLARIZATION,FY,1);
+        xg1 = squeeze(xg(:,:,1));
+        yg1 = squeeze(yg(:,:,1));
 
-Px_a = zeros(size(ni,1),size(ni,2));
-%Py_a = zeros(size(ni,1),size(ni,2));
+        [r_max,c_max] = find(squeeze(n(:,:,1)) == max(max(squeeze(n(:,:,1)))));
 
-Px_a(2:end-1,2:end-1) = reshape(Modenfeld_Px(:,1),dim_yl,dim_xl);
-%Py_a(2:end-1,2:end-1) = reshape(Modenfeld_Py(:,1),dim_yl,dim_xl);
+        xg1 = xg1 - xg1(r_max(1),c_max(1));
+        yg1 = yg1 - yg1(r_max(1),c_max(1));
 
-Px_a = Px_a/max(max(abs((Px_a))));
-%Py_a = Py_a/max(max(abs((Py_a))));
+        Px_a = 1*exp(-xg1.^2/(2*(sigma_x))^2 -yg1.^2/(2*(sigma_y))^2);
+        Px(:,:,1) = Px_a;    
+        
+    else
+       
+        out = 'Invalid specification of excitation. EXCITATION.sigma_x and EXCITATION.sigma_y have to be numeric values for field type ''gauss''.';
+        disp(out)
+        return
+        
+    end
+    
+elseif strcmp(excitation,'full')
+    
+    threshold = EXCITATION.threshold;
+    
+    if isnumeric(threshold) && (threshold < 1) && (threshold > 0) 
+        
+        n_threshold = min(min(squeeze(n(:,:,1)))) + delta_n * threshold;
+        Px_a = zeros(size(n,1),size(n,2));
+        Px_a(find(squeeze(n(:,:,1)) >= n_threshold)) = 1;
 
-%% Anfangswerte für die Felder
+        Px(:,:,1) = Px_a;
+        
+    else
+        
+        out = 'Invalid specification of threshold parameter. EXCITATION.threshold has to be numeric and 0 < threshold < 1.';
+        disp(out)
+        return
+        
+    end
 
-Px(:,:,1) = Px_a;
+elseif strcmp(excitation,'modal')
+    
+    nb_interpolation = EXCITATION.nb_interpolation;
+    propagation_constant = EXCITATION.mode;
+    
+    % Interpolation des Brechzahlprofils zur Bestimmung der Ausbreitungskonstanten und des Grundmodenfeldes
 
-xg1 = squeeze(xg(:,:,1));
-yg1 = squeeze(yg(:,:,1));
+    ni = interpn(squeeze(n(:,:,1)),nb_interpolation);    % ver-nb_interpolation-fachung des Brechzahlprofils
+    
+    % Bestimmung der Ausbreitungskonstanten und des Grundmodenfeldes
 
-[r_max,c_max] = find(squeeze(n(:,:,1)) == max(max(squeeze(n(:,:,1)))));
+    [n_eff_pc_Px,Modenfeld_Px] = FD_propagationconstants_Semivec_(ni,beta_0,xg(:,:,1),yg(:,:,1),dim_y,dim_xl,dim_yl,dG.cg,dG.cl,POLARIZATION,FX,1); 
+    [n_eff_pc_Py,Modenfeld_Py] = FD_propagationconstants_Semivec_(ni,beta_0,xg(:,:,1),yg(:,:,1),dim_y,dim_xl,dim_yl,dG.cg,dG.cl,POLARIZATION,FY,1);
 
-xg1 = xg1 - xg1(r_max(1),c_max(1));
-yg1 = yg1 - yg1(r_max(1),c_max(1));
+    Px_a = zeros(size(ni,1),size(ni,2));
+    Py_a = zeros(size(ni,1),size(ni,2));
 
-test = 1*exp(-xg1.^2/(3e-6)^2 -yg1.^2/(3e-6).^2);
-[r_max,c_max] = find(test == max(max(test)));
+    Px_a(2:end-1,2:end-1) = reshape(Modenfeld_Px(:,1),dim_yl,dim_xl);
+    Py_a(2:end-1,2:end-1) = reshape(Modenfeld_Py(:,1),dim_yl,dim_xl);
 
-% figure
-% surf(xg1,yg1,test)
-% shading flat
+    Px_a = Px_a/max(max(abs((Px_a))));
+    Py_a = Py_a/max(max(abs((Py_a))));
+    
+    Px(:,:,1) = Px_a;
+    Py(:,:,1) = Py_a;
+    
+    if strcmp(propagation_constant,'beta_z')
+        
+        n_eff_Px = n_eff_pc_Px;
+        n_eff_Py = n_eff_pc_Py;
+        
+    elseif ~strcmp(propagation_constant,'k_bar')
+        
+        out = 'Invalid specification of excitation. Possible choices for EXCITATION.mode for modal propagation are: ''beta_z'' and ''k_bar''.';
+        disp(out)
+        return
+        
+    end
+    
+else
+    
+    out = 'Invalid excitation field. Possible choices for EXCITATION.field are: ''gauss'', ''full'' or ''modal''.';
+    disp(out)
+    return
+    
+end
 
-Px_a(:,:) = test;
-Px(:,:,1) = Px_a;
-
-% n_threshold = min(min(squeeze(n(:,:,1)))) + (.5)*(max(max(squeeze(n(:,:,1)))) - min(min(squeeze(n(:,:,1)))));
-% Px_a = zeros(size(ni,1),size(ni,2));
-% Px_a(find(squeeze(n(:,:,1)) >= n_threshold)) = 1;
-% %Px_a(:,:) = test;
-% Px(:,:,1) = Px_a;
-% surf(xg(:,:,1),yg(:,:,1),Px_a)
+if visualize_excitation == 1
+    
+    figure
+    surf(xg(:,:,1),yg(:,:,1),Px(:,:,1))
+    shading flat
+    
+end
 
 %% Multistep Variablen generieren
 
@@ -99,13 +160,11 @@ Px(:,:,1) = Px_a;
 % Parameter, bei zum Beispiel einem nicht äquidistanten Propagationsgrid,
 % müssen diese in der folgende Schleife mitberechnet werden.
 
-[ux,vx] = gen_multistep_vars_11_(dz,alpha,beta_z);   
-%[uy,vy] = gen_multistep_vars_(dz,alpha,n_eff_Py);
+[ux,vx] = gen_multistep_vars_11_(dz,alpha,beta_z);  
 
 %% Propagation in z-Richtung
 
 tic
-c_alt = 1;
 c = 1; % Globaler Forschrittszähler
 
 h = waitbar(0,'','Name',['Berechne Padé ' POLARIZATION '-BPM mit ' BC '-Randbedingung...']);
@@ -285,6 +344,7 @@ for kz = 1:1:size(n,3)-1
         
         bxx = sparse(Cbxx + Nbxx + Sbxx + Ebxx + Wbxx);
 
+        %spy(Axx)
         
 
 %         Bxx = sparse((size(n,1)-2)*(size(n,2)-2),(size(n,1)-2)*(size(n,2)-2));
@@ -344,10 +404,20 @@ for kz = 1:1:size(n,3)-1
         Pbx = zeros(dim_y,dim_x); 
         Pbx(2:end-1,2:end-1) = reshape(Px_l,dim_yl,dim_xl);
         
-        %% Absorber hinzufügen
+        %% Absorber anwenden
         
-         adr_n_threshold         = find(squeeze(n(:,:,kz)) <= 1.6);
-         Pbx(adr_n_threshold)    = 0;
+        if isnumeric(ABSORBER) && ((ABSORBER - n_min) < delta_n)
+        
+            adr_n_threshold         = find(squeeze(n(:,:,kz)) <= ABSORBER);
+            Pbx(adr_n_threshold)    = 0;
+            
+        else 
+            
+            out = 'Invalid specification of Absorber threshold: n_min < ABSORBER < n_max';
+            disp(out)
+            return
+            
+        end
 
     end
     
