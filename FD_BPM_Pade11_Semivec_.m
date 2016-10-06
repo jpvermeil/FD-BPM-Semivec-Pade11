@@ -1,10 +1,10 @@
-function [Px,glob_adr_slgs,dim_xl,dim_yl] = FD_BPM_Pade11_Semivec_vec_(n,lambda,n_eff_Px,alpha,solver_tol,xg,yg,dz,EXCITATION,POLARIZATION,FIELDCOMPONENTS,BC,absorber)
+function [Px,glob_adr_slgs,dim_xl,dim_yl] = FD_BPM_Pade11_Semivec_(n,lambda,n_eff_Px,alpha,solver_tol,xg,yg,dz,EXCITATION,POLARIZATION,FIELDCOMPONENTS,BC,absorber)
 % Semi vectorial wide angle Padé(1,1) finite difference BPM for TE/TM E-
 % and/or H-fields in 3D structures.
 % 
 % SYNOPSIS
 %
-% FD_BPM_Pade11_Semivec_vec_(n,lambda,n_eff_Px,alpha,solver_tol,xg,yg,dz,EXCITATION,POLARIZATION,FIELDCOMPONENTS,BC,absorber)
+% FD_BPM_Pade11_Semivec_(n,lambda,n_eff_Px,alpha,solver_tol,xg,yg,dz,EXCITATION,POLARIZATION,FIELDCOMPONENTS,BC,absorber)
 % 
 % VARIABLES
 %
