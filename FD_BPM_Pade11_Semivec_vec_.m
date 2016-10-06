@@ -108,8 +108,8 @@ elseif strcmp(excitation,'modal')
     
     % Bestimmung der Ausbreitungskonstanten und des Grundmodenfeldes
 
-    [n_eff_pc_Px,Modenfeld_Px] = FD_propagationconstants_Semivec_(ni,beta_0,xg(:,:,1),yg(:,:,1),dim_y,dim_xl,dim_yl,dG.cg,dG.cl,POLARIZATION,FX,1); 
-    [n_eff_pc_Py,Modenfeld_Py] = FD_propagationconstants_Semivec_(ni,beta_0,xg(:,:,1),yg(:,:,1),dim_y,dim_xl,dim_yl,dG.cg,dG.cl,POLARIZATION,FY,1);
+    [n_eff_pc_Px,Modenfeld_Px] = FD_propagationconstants_Semivec_(ni,beta_0,squeeze(xg(:,:,1)),squeeze(yg(:,:,1)),dim_y,dim_xl,dim_yl,dG.cg,dG.cl,POLARIZATION,FX,1); 
+    [n_eff_pc_Py,Modenfeld_Py] = FD_propagationconstants_Semivec_(ni,beta_0,squeeze(xg(:,:,1)),squeeze(yg(:,:,1)),dim_y,dim_xl,dim_yl,dG.cg,dG.cl,POLARIZATION,FY,1);
 
     Px_a = zeros(size(ni,1),size(ni,2));
     Py_a = zeros(size(ni,1),size(ni,2));
@@ -406,14 +406,14 @@ for kz = 1:1:size(n,3)-1
         
         %% Absorber anwenden
         
-        if isnumeric(ABSORBER) && ((ABSORBER - n_min) < delta_n)
+        if isnumeric(ABSORBER) && ((ABSORBER - n_min) < delta_n) && ((ABSORBER - n_min) > 0)
         
             adr_n_threshold         = find(squeeze(n(:,:,kz)) <= ABSORBER);
             Pbx(adr_n_threshold)    = 0;
             
         else 
             
-            out = 'Invalid specification of Absorber threshold: n_min < ABSORBER < n_max';
+            out = 'Invalid specification of Absorber threshold: n_min < ABSORBER < n_max.';
             disp(out)
             return
             
