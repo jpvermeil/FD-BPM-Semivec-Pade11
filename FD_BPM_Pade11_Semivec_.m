@@ -40,6 +40,8 @@ function [Px,glob_adr_slgs,dim_xl,dim_yl] = FD_BPM_Pade11_Semivec_(n,lambda,n_ef
 %   absorber        Numerical value for the application of an n-dependent absorber. It absorbs
 %                   the field at any place where n is lower than the value of absorber. This is
 %                   to avoid unwanted reflections.
+%                   The valid range for this value is: n_min < absorber < n_max.
+%                   While 0 no absorber is applied.
 
 format long
 
@@ -179,6 +181,26 @@ if visualize_excitation == 1 % Visualize excitation
     
 end
 
+%% Defining gamma for handling different boundary conditions
+
+if strcmp(BC,'ABC')
+    
+    gamma_bc = 0;
+    
+elseif strcmp(BC,'TBC')
+    
+    out = 'Transparent boundary condition not yet supported. Please use absorbing boundary condition: ''ABC''.';
+    disp(out)
+    return
+    
+else
+    
+    out = 'Invalid specification of boundary condition. Possible choices are ''ABC'' or ''TBC''.';
+    disp(out)
+    return
+    
+end
+
 %% Generate multistep paramters
 
 % Usually those parameters do not change for the whole propagation
@@ -202,8 +224,8 @@ for kz = 1:1:size(n,3)-1
  
     %% Call functions for calculation of diagonals
     
-    [ Cxx,Nxx,Sxx,Exx,Wxx ]      = diagonals_pade_(beta_0,n_eff_Px,n(:,:,kz+1),xg(:,:,kz+1),yg(:,:,kz+1),dim_y,dim_xl,dim_yl,dG,gamma_tbc,POLARIZATION,FX,BC);
-    [ Cbxx,Nbxx,Sbxx,Ebxx,Wbxx ] = diagonals_pade_(beta_0,n_eff_Px,n(:,:,kz),xg(:,:,kz),yg(:,:,kz),dim_y,dim_xl,dim_yl,dG,gamma_tbc,POLARIZATION,FX,BC);
+    [ Cxx,Nxx,Sxx,Exx,Wxx ]      = diagonals_pade_(beta_0,n_eff_Px,n(:,:,kz+1),xg(:,:,kz+1),yg(:,:,kz+1),dim_y,dim_xl,dim_yl,dG,gamma_bc,POLARIZATION,FX,BC);
+    [ Cbxx,Nbxx,Sbxx,Ebxx,Wbxx ] = diagonals_pade_(beta_0,n_eff_Px,n(:,:,kz),xg(:,:,kz),yg(:,:,kz),dim_y,dim_xl,dim_yl,dG,gamma_bc,POLARIZATION,FX,BC);
     
     %% Apply multistep method
     
@@ -249,14 +271,14 @@ for kz = 1:1:size(n,3)-1
         
         %% Apply absorber if specified
         
-        if isnumeric(absorber) && ((absorber - n_min) < delta_n) && ((absorber - n_min) > 0)
+        if isnumeric(absorber) && (absorber > n_min) && (absorber < n_max) && (absorber ~= 0)
         
             adr_n_threshold         = find(squeeze(n(:,:,kz)) <= absorber);
             Pbx(adr_n_threshold)    = 0;
             
-        else 
+        elseif ~isnumeric(absorber) || ((absorber < n_min) && (absorber ~= 0))|| (absorber > n_max)
             
-            out = 'Invalid specification of Absorber threshold: n_min < ABSORBER < n_max.';
+            out = 'Invalid specification of absorber: n_min < absorber < n_max. Alternatively use »0« for no absorption.';
             disp(out)
             return
             
@@ -270,7 +292,7 @@ for kz = 1:1:size(n,3)-1
     
     % Update progress bar
     
-    step_percent = 10;  % Defines step size for progress bar update
+    step_percent = 1;  % Defines step size for progress bar update
     
     if floor(100*kz/(size(n,3)-1)) > c*step_percent 
       
