@@ -37,11 +37,12 @@ function [Px,glob_adr_slgs,dim_xl,dim_yl] = FD_BPM_Pade11_Semivec_(n,lambda,n_ef
 %   POLARIZATION    String value that can either be 'TE' or 'TM'
 %   FIELDCOMPONENTS Can be 'Ex', 'Ey', 'Hx' or 'Hy'
 %   BC              String value speficying boundary condition. Currently only 'ABC' supported
-%   absorber        Numerical value for the application of an n-dependent absorber. It absorbs
-%                   the field at any place where n is lower than the value of absorber. This is
-%                   to avoid unwanted reflections.
-%                   The valid range for this value is: n_min < absorber < n_max.
+%   absorber        Numerical value for the application of an delta_n-dependent absorber. 
+%                   The valid range for this value is: 0 <= absorber < 1.
+%                   The value specifies the absorption range of delta_n. 
 %                   While 0 no absorber is applied.
+%                   Example: 0.1 -> Absorbing where n < 0.1 * delta_n (lowest 10%)
+%                   Example: 0.9 -> Absorbing where n < 0.9 * delta_n (lowest 90%)
 
 format long
 
@@ -271,14 +272,15 @@ for kz = 1:1:size(n,3)-1
         
         %% Apply absorber if specified
         
-        if isnumeric(absorber) && (absorber > n_min) && (absorber < n_max) && (absorber ~= 0)
+        if isnumeric(absorber) && (absorber > 0) && (absorber < 1) && (absorber ~= 0)
         
-            adr_n_threshold         = find(squeeze(n(:,:,kz)) <= absorber);
+            n_threshold             = n_min + delta_n * absorber;
+            adr_n_threshold         = find(squeeze(n(:,:,kz)) <= n_threshold);
             Pbx(adr_n_threshold)    = 0;
             
-        elseif ~isnumeric(absorber) || ((absorber < n_min) && (absorber ~= 0))|| (absorber > n_max)
+        elseif ~isnumeric(absorber) || (absorber < 0) || (absorber > 1)
             
-            out = 'Invalid specification of absorber: n_min < absorber < n_max. Alternatively use »0« for no absorption.';
+            out = 'Invalid specification of absorber: 0 <= absorber < 1.';
             disp(out)
             return
             
@@ -301,10 +303,10 @@ for kz = 1:1:size(n,3)-1
         minutes_passed      = floor(toc/60);
         seconds_passed      = toc - minutes_passed*60;
         minutes_remaining   = floor((toc/c)*((100/step_percent)-c)/60);
-        minutes_remaining   = (toc/c)*((100/step_percent)-c) - minutes_remaining*60;
+        seconds_remaining   = (toc/c)*((100/step_percent)-c) - minutes_remaining*60;
         c = c + 1;
         
-        waitbar(kz/(size(n,3)-1),h,['Progress: ' num2str(c*step_percent) '%. Time remaining: ' num2str(minutes_remaining) 'm ' num2str(minutes_remaining) 's.']) 
+        waitbar(kz/(size(n,3)-1),h,['Progress: ' num2str(c*step_percent) '%. Time remaining: ' num2str(floor(minutes_remaining)) 'm ' num2str(ceil(seconds_remaining)) 's.']) 
       
       else 
           
