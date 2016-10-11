@@ -1,10 +1,10 @@
-function [Px,glob_adr_slgs,dim_xl,dim_yl] = FD_BPM_Pade11_Semivec_(n,lambda,n_eff_Px,alpha,solver_tol,xg,yg,dz,EXCITATION,POLARIZATION,FIELDCOMPONENTS,BC,absorber)
+function [Px,glob_adr_slgs,dim_xl,dim_yl] = FD_BPM_Pade11_Semivec_(n,lambda,n_eff_Px,alpha,solver_tol,xg,yg,dz,EXCITATION,POLARIZATION,FIELDCOMPONENTS,BC,ABSORBER,PROGRESS)
 % Semi vectorial wide angle Padé(1,1) finite difference BPM for TE/TM E-
 % and/or H-fields in 3D structures.
 % 
 % SYNOPSIS
 %
-% FD_BPM_Pade11_Semivec_(n,lambda,n_eff_Px,alpha,solver_tol,xg,yg,dz,EXCITATION,POLARIZATION,FIELDCOMPONENTS,BC,absorber)
+% FD_BPM_Pade11_Semivec_(n,lambda,n_eff_Px,alpha,solver_tol,xg,yg,dz,EXCITATION,POLARIZATION,FIELDCOMPONENTS,BC,ABSORBER,PROGRESS)
 % 
 % VARIABLES
 %
@@ -43,6 +43,10 @@ function [Px,glob_adr_slgs,dim_xl,dim_yl] = FD_BPM_Pade11_Semivec_(n,lambda,n_ef
 %                   While 0 no absorber is applied.
 %                   Example: 0.1 -> Absorbing where n < 0.1 * delta_n (lowest 10%)
 %                   Example: 0.9 -> Absorbing where n < 0.9 * delta_n (lowest 90%)
+%   PROGRESS        Defines type of progress information.
+%                   String value that can either be:
+%                   'bar':  Visual waitbar
+%                   'cl':   Command line (useful for batch mode)
 
 format long
 
@@ -210,12 +214,16 @@ end
 
 [ux,vx] = gen_multistep_vars_11_(dz,alpha,beta_z);  
 
-%% Propagation in z direction
-
 tic
 c = 1; % Global progress counter (waitbar)
 
-h = waitbar(0,'','Name',['Computing Padé ' POLARIZATION '-BPM with ' BC ' boundary condition...']);
+if strcmp(PROGRESS,'bar') == 1 
+    
+    h = waitbar(0,'','Name',['Computing Padé ' POLARIZATION '-BPM with ' BC ' boundary condition...']);
+
+end
+
+%% Propagation in z direction
 
 for kz = 1:1:size(n,3)-1
     
@@ -272,13 +280,13 @@ for kz = 1:1:size(n,3)-1
         
         %% Apply absorber if specified
         
-        if isnumeric(absorber) && (absorber > 0) && (absorber < 1) && (absorber ~= 0)
+        if isnumeric(ABSORBER) && (ABSORBER > 0) && (ABSORBER < 1) && (ABSORBER ~= 0)
         
-            n_threshold             = n_min + delta_n * absorber;
+            n_threshold             = n_min + delta_n * ABSORBER;
             adr_n_threshold         = find(squeeze(n(:,:,kz)) <= n_threshold);
             Pbx(adr_n_threshold)    = 0;
             
-        elseif ~isnumeric(absorber) || (absorber < 0) || (absorber > 1)
+        elseif ~isnumeric(ABSORBER) || (ABSORBER < 0) || (ABSORBER > 1)
             
             out = 'Invalid specification of absorber: 0 <= absorber < 1.';
             disp(out)
@@ -294,29 +302,51 @@ for kz = 1:1:size(n,3)-1
     
     % Update progress bar
     
-    step_percent = 1;  % Defines step size for progress bar update
+    if strcmp(PROGRESS,'bar') == 1
     
-    if floor(100*kz/(size(n,3)-1)) > c*step_percent 
-      
-      if ishandle(h)    % Check if waitbar has not been closed to prevent error
-           
-        minutes_passed      = floor(toc/60);
-        seconds_passed      = toc - minutes_passed*60;
-        minutes_remaining   = floor((toc/c)*((100/step_percent)-c)/60);
-        seconds_remaining   = (toc/c)*((100/step_percent)-c) - minutes_remaining*60;
-        c = c + 1;
+        step_percent = 1;  % Defines step size for progress bar update
+
+        if floor(100*kz/(size(n,3)-1)) > c*step_percent 
+
+          if ishandle(h)    % Check if waitbar has not been closed to prevent error
+
+            minutes_passed      = floor(toc/60);
+            seconds_passed      = toc - minutes_passed*60;
+            minutes_remaining   = floor((toc/c)*((100/step_percent)-c)/60);
+            seconds_remaining   = (toc/c)*((100/step_percent)-c) - minutes_remaining*60;
+
+            waitbar(kz/(size(n,3)-1),h,['Progress: ' num2str(c*step_percent) '%. Time remaining: ' num2str(floor(minutes_remaining)) 'm ' num2str(ceil(seconds_remaining)) 's.']) 
+
+            c = c + 1;
+
+          else 
+
+             disp('Process interrupted') 
+             break
+
+          end 
+        end 
+   
+    elseif strcmp(PROGRESS,'cl') == 1
         
-        waitbar(kz/(size(n,3)-1),h,['Progress: ' num2str(c*step_percent) '%. Time remaining: ' num2str(floor(minutes_remaining)) 'm ' num2str(ceil(seconds_remaining)) 's.']) 
-      
-      else 
-          
-         disp('Process interrupted') 
-         break
-         
-      end 
-   end 
-    
-    
+        step_percent = 10;  % Defines step size for progress bar update
+
+        if floor(100*kz/(size(n,3)-1)) > c*step_percent 
+
+            minutes_passed      = floor(toc/60);
+            seconds_passed      = toc - minutes_passed*60;
+            minutes_remaining   = floor((toc/c)*((100/step_percent)-c)/60);
+            seconds_remaining   = (toc/c)*((100/step_percent)-c) - minutes_remaining*60;
+
+            out = ['   Progress: ' num2str(c*step_percent) '%. Time remaining: ' num2str(floor(minutes_remaining)) 'm ' num2str(ceil(seconds_remaining)) 's.'];
+            disp(out)
+
+            c = c + 1;
+            
+        end
+        
+        
+    end
     
 end
 
