@@ -9,11 +9,13 @@ function [Px,glob_adr_slgs,dim_xl,dim_yl] = FD_BPM_Pade11_Semivec_(n,lambda,n_ef
 % VARIABLES
 %
 %   n               Refractive index profile
-%   lambda          Wavelength
+%   lambda          Optical wavelength
 %   alpha           Discretization parameter in propagation direction
 %   solver_tol      Tolerance of bicgstab solver
-%   xg              Grid of x dimension. Has to match dimensions of n.
+%   xg              Grid of x dimension. Has to match dimensions of n. 
+%                   Has to be X output of Matlab meshgrid function ([X,Y,Z] = meshgrid(x,y,z))
 %   yg              Grid of y dimension. Has to match dimensions of n.
+%                   Has to be Y output of Matlab meshgrid function ([X,Y,Z] = meshgrid(x,y,z))
 %   EXCITATION      Structural variable for the definition of exciting field distribution 
 %       .fieldtype              Can be 'gauss', 'full' or 'modal'
 %       .visualize_excitation   Numerical flat for visualization of excitation
