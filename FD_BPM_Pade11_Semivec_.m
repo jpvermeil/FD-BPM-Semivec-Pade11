@@ -10,6 +10,7 @@ function [Px,glob_adr_slgs,dim_xl,dim_yl] = FD_BPM_Pade11_Semivec_(n,lambda,n_ef
 %
 %   n               Refractive index profile
 %   lambda          Optical wavelength
+%   n_eff_Ex        Propagation constant (For wide angle Pade BPM this is usually (n1+n2)/2)
 %   alpha           Discretization parameter in propagation direction
 %   solver_tol      Tolerance of bicgstab solver
 %   xg              Grid of x dimension. Has to match dimensions of n. 
