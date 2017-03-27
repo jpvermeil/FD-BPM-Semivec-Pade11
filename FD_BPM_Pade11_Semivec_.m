@@ -39,7 +39,7 @@ function [Px,glob_adr_slgs,dim_xl,dim_yl] = FD_BPM_Pade11_Semivec_(n,lambda,n_ef
 %   POLARIZATION    String value that can either be 'TE' or 'TM'
 %   FIELDCOMPONENTS Can be 'Ex', 'Ey', 'Hx' or 'Hy'
 %   BC              String value speficying boundary condition. Currently only 'ABC' supported
-%   absorber        Numerical value for the application of an delta_n-dependent absorber. 
+%   ABSORBER        Numerical value for the application of an delta_n-dependent absorber. 
 %                   The valid range for this value is: 0 <= absorber < 1.
 %                   The value specifies the absorption range of delta_n. 
 %                   While 0 no absorber is applied.
