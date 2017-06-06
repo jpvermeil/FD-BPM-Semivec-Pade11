@@ -18,7 +18,7 @@ function [Px,glob_adr_slgs,dim_xl,dim_yl] = FD_BPM_Pade11_Semivec_(n,lambda,n_ef
 %   yg              Grid of y dimension. Has to match dimensions of n.
 %                   Has to be Y output of Matlab meshgrid function ([X,Y,Z] = meshgrid(x,y,z))
 %   EXCITATION      Structural variable for the definition of exciting field distribution 
-%       .fieldtype              Can be 'gauss', 'full' or 'modal'
+%       .fieldtype              Can be 'gauss', 'full', 'modal' or 'external'
 %       .visualize_excitation   Numerical flat for visualization of excitation
 %       (gaussian)
 %           .sigma_x            Sigma of gaussian beam in x direction in [um]
@@ -36,7 +36,10 @@ function [Px,glob_adr_slgs,dim_xl,dim_yl] = FD_BPM_Pade11_Semivec_(n,lambda,n_ef
 %                               other value than »0« is supported. 
 %           .mode               String value that can either be 'beta_z' or 'k_bar'.
 %                               beta_z will use propagation constant of calculated fundamental mode
-%                               k_bar will use those of wide angle Padé approximation  
+%                               k_bar will use those of wide angle Padé approximation
+%       (external)  
+%           .field              A field distribution can be provided at this point. Its size has to
+%                               match the defined grid sizes.
 %   POLARIZATION    String value that can either be 'TE' or 'TM'
 %   FIELDCOMPONENTS Can be 'Ex', 'Ey', 'Hx' or 'Hy'
 %   BC              String value speficying boundary condition. Currently only 'ABC' supported
@@ -50,6 +53,7 @@ function [Px,glob_adr_slgs,dim_xl,dim_yl] = FD_BPM_Pade11_Semivec_(n,lambda,n_ef
 %                   String value that can either be:
 %                   'bar':  Visual waitbar
 %                   'cl':   Command line (useful for batch mode)
+%                   'off':  No progress indicator (useful for step mode)
 
 format long
 
@@ -173,9 +177,25 @@ elseif strcmp(excitation,'modal') % Excitation with the fundamental mode
         
     end
     
+elseif strcmp(excitation,'external')
+    
+    if isnumeric(EXCITATION.field) && size(EXCITATION.field,1) == size(n,1) && size(EXCITATION.field,2) == size(n,2)
+    
+        Px_a = EXCITATION.field;
+        Px_a = Px_a/max(max(abs((Px_a))));
+        Px(:,:,1) = Px_a;
+        
+    else
+        
+        out = 'Invalid specification of external field distribution. EXCITATION.field has to be a matrix matching the dimesions of the outer grids.';
+        disp(out)
+        return
+        
+    end
+    
 else
     
-    out = 'Invalid excitation field. Possible choices for EXCITATION.field are: ''gauss'', ''full'' or ''modal''.';
+    out = 'Invalid excitation field. Possible choices for EXCITATION.field are: ''gauss'', ''full'', ''modal'' or ''external''.';
     disp(out)
     return
     
@@ -184,7 +204,7 @@ end
 if visualize_excitation == 1 % Visualize excitation
     
     figure
-    surf(xg(:,:,1),yg(:,:,1),Px(:,:,1))
+    surf(xg(:,:,1),yg(:,:,1),abs(Px(:,:,1)))
     shading flat
     
 end
@@ -346,11 +366,10 @@ for kz = 1:1:size(n,3)-1
 
             c = c + 1;
             
-        end
-        
+        end    
         
     end
-    
+        
 end
 
 try
@@ -360,7 +379,11 @@ end
 minutes_passed     = floor(toc/60);
 seconds_passed    = toc - minutes_passed*60;
 
-out = ['BPM-calculation finished after: ' num2str(minutes_passed) 'm ' num2str(seconds_passed) 's.'];
-disp(out);
+if strcmp(PROGRESS,'off') == 0
+
+    out = ['BPM-calculation finished after: ' num2str(minutes_passed) 'm ' num2str(seconds_passed) 's.'];
+    disp(out);
+    
+end
 
 end
