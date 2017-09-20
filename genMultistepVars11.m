@@ -1,4 +1,18 @@
-function [u,v]=gen_multistep_vars_11_(dz, alpha, beta_z)
+function [u,v]=genMultistepVars11(dz,alpha,beta_z)
+% This function generates the multistep Varialbes 'u' and 'v' for the
+% Padé(1,1) finite difference BPM. For further information on the
+% calculation procedure see: the book: "Introduction to optical waveguide
+% analysis" by K. Kawano and T. Kitoh.
+%
+% SYNOPSIS
+% 
+% [u,v] = genMultistepVars11(dz,alpha,beta_z)
+% 
+% VARIABLES
+% 
+% dz          Step in z-direction
+% alpha       Derivation paramter of Crank-Nicolson scheme
+% beta_z      Propagation constant
 
 u = zeros(1,1);
 v = zeros(1,1);

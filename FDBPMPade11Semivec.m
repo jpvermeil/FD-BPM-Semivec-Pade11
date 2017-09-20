@@ -4,7 +4,7 @@ function [phi,globalAdrSlgs,dim_xl,dim_yl] = FDBPMPade11Semivec(n,lambda,neff,al
 % 
 % SYNOPSIS
 %
-% FDBPMPade11Semivec(n,lambda,n_eff_Phi_x,alpha,solver_tol,xg,yg,dz,EXCITATION,POLARIZATION,FIELDCOMPONENTS,BC,ABSORBER,PROGRESS)
+% FDBPMPade11Semivec(n,lambda,neff,alpha,solverTolerance,xg,yg,dz,EXCITATION,POLARIZATION,FIELDCOMPONENTS,BC,ABSORBER,PROGRESS)
 % 
 % VARIABLES
 %
@@ -59,14 +59,14 @@ format long
 
 %% Definition of variables and constants
 
-beta_0 = 2*pi/lambda;
-beta_z = beta_0 * neff;
-n_max = max(max(n(:,:,1)));
-n_min = min(min(n(:,:,1)));
-delta_n = n_max - n_min;                % refractive index contrast
+beta_0 = 2*pi/lambda;           % wave number
+beta_z = beta_0 * neff;         % propagation constant as defined by neff
+n_max = max(max(n(:,:,1)));     % maximum value of n
+n_min = min(min(n(:,:,1)));     % minimum value of n
+delta_n = n_max - n_min;        % maximum refractive index contrast
 
 % Check field components input
-[FX,~] = checkFieldComponents(FIELDCOMPONENTS);
+[FX,~] = checkFieldComponents(FIELDCOMPONENTS); % Function checks which field component is to be evaluated
         
 %% BPM specific parameters
 
@@ -76,12 +76,12 @@ dim_x   = size(n,2); % Number of global elements in x direction
 dim_xl  = size(n,2) - 2; % Number of local elements in y direction (without the boundary of the structure)
 dim_yl  = size(n,1) - 2; % Number of local elements in x direction (without the boundary of the structure)
 
-phi = zeros(size(n,1),size(n,2),size(n,3));
+phi = zeros(size(n,1),size(n,2),size(n,3)); % field matrix
 
 grid.localIndex = zeros(size(n,1),size(n,2)); % Grid that speficies lokal element numbers
 grid.localIndex(2:end-1,2:end-1) = reshape(1:1:dim_xl*dim_yl',dim_yl,dim_xl);
 
-grid.globalIndex = zeros(size(n,1),size(n,2)); % Grid that speficies global element numbers
+grid.globalIndex = zeros(size(n,1),size(n,2)); % Grid that speficies global element numbers. Note that in the global case (looking at the outer dimensions of the grid that include the boundary) there is no difference between 'Index' and 'Adress'. For this reason 'Index' is used in matrix form and 'Adr' is used as vector.
 grid.globalIndex(1:end) = 1:1:length(grid.globalIndex(1:end));
 
 grid.boundaryFlag = zeros(size(n,1),size(n,2));  % Grid that flags boundary elements of the structure
@@ -114,7 +114,7 @@ if strcmp(fieldtype,'gauss') % Excitation with a gaussian beam
         yg1 = yg1 - yg1(r_max(1),c_max(1)); % y-grid for the definition of the gaussian beam
 
         phiInput = 1*exp(-xg1.^2/(2*(sigma_x))^2 -yg1.^2/(2*(sigma_y))^2);  % Definition of gaussian beam
-        phi(:,:,1) = phiInput;                                               % Merging gaussian beam in global field matrix 
+        phi(:,:,1) = phiInput;                                              % Merging gaussian beam in global field matrix 
         
     else
        
@@ -127,8 +127,8 @@ if strcmp(fieldtype,'gauss') % Excitation with a gaussian beam
 elseif strcmp(fieldtype,'full')        % Excitation with a constant illumination pattern
     
     threshold = EXCITATION.threshold;   % threshold value determines how much of the waveguide's core is excited by full illuminating source. It determines how big the part of delta_n is which is illuminated.
-    % Expample: threhold = 0.9; -> Maximum 90% of delta_n are illuminated
-    % Expample: threhold = 0.6; -> Maximum 60% of delta_n are illuminated
+    % Expample: threhold = 0.9; -> Maximum 90% of delta_n is illuminated
+    % Expample: threhold = 0.6; -> Maximum 60% of delta_n is illuminated
     
     if isnumeric(threshold) && (threshold < 1) && (threshold > 0) 
         
@@ -148,24 +148,21 @@ elseif strcmp(fieldtype,'full')        % Excitation with a constant illumination
 
 elseif strcmp(fieldtype,'modal') % Excitation with the fundamental mode
     
-    numberInterpolation = EXCITATION.numberInterpolation;     % Specify number of interpolations of refractive index profile for the determination of propagation constants 
-    propagationConstant = EXCITATION.mode;             % Mode parameter determines if beta_z of the fundamental mode or k_bar of Padé approximation should be used for propagation
+    numberInterpolation = EXCITATION.numberInterpolation;   % Specify number of interpolations of refractive index profile for the determination of propagation constants 
+    propagationConstant = EXCITATION.mode;                  % Mode parameter determines if beta_z of the fundamental mode or k_bar of Padé approximation should be used for propagation
     
     nInterpolated = interpn(squeeze(n(:,:,1)),numberInterpolation);   % This causes n with dimension j x k to be interpolated. Resulting profile ni will have dimensions ((j-1)^numberInterpolation + 1) x ((k-1)^numberInterpolation + 1)
     
     % Calculate propagation constants of fundamental mode
-
     [neff_pc,modenfeld] = FDPropagationconstantsSemivec(nInterpolated,beta_0,squeeze(xg(:,:,1)),squeeze(yg(:,:,1)),dim_y,dim_xl,dim_yl,grid.globalIndex,grid.localIndex,POLARIZATION,FX,1); 
 
     phiInput = zeros(size(nInterpolated,1),size(nInterpolated,2));
-
-    phiInput(2:end-1,2:end-1) = reshape(modenfeld(:,1),dim_yl,dim_xl);   % Reshaping modefield vector to match size of global field matrix
-
-    phiInput = phiInput/max(max(abs((phiInput))));
+    phiInput(2:end-1,2:end-1) = reshape(modenfeld(:,1),dim_yl,dim_xl);  % Reshaping modefield vector to match size of global field matrix
+    phiInput = phiInput/max(max(abs((phiInput))));            
     
-    phi(:,:,1) = phiInput; % Merging mode field in global field matrix 
+    phi(:,:,1) = phiInput;  % Merging mode field in global field matrix 
     
-    if strcmp(propagationConstant,'beta_z') % Use beta_z of calculated modefield for propagation
+    if strcmp(propagationConstant,'beta_z')     % Use beta_z of calculated modefield for propagation
         
         neff = neff_pc; 
         
@@ -177,13 +174,13 @@ elseif strcmp(fieldtype,'modal') % Excitation with the fundamental mode
         
     end
     
-elseif strcmp(fieldtype,'external')
+elseif strcmp(fieldtype,'external') % Excitation with an externally defined field
     
-    if isnumeric(EXCITATION.field) && size(EXCITATION.field,1) == size(n,1) && size(EXCITATION.field,2) == size(n,2)
+    if isnumeric(EXCITATION.field) && size(EXCITATION.field,1) == size(n,1) && size(EXCITATION.field,2) == size(n,2)    % Dimension check
     
         phiInput = EXCITATION.field;
         phiInput = phiInput/max(max(abs((phiInput))));
-        phi(:,:,1) = phiInput;
+        phi(:,:,1) = phiInput;  % Merging mode field in global field matrix
         
     else
         
@@ -261,9 +258,9 @@ for kz = 1:1:size(n,3)-1
     
     %% Apply multistep method
     
-    for ii = 1:1:1
+    for ii = 1:1:1  % Padé(1,1) only requires one multistep
         
-        % Paste diagonals in system matrix
+        % Merge diagonals in system matrix
         
         A = sparse((size(n,1)-2)*(size(n,2)-2),(size(n,1)-2)*(size(n,2)-2));
         A = spdiags(1 + VX(ii)*diagC,0,A);
@@ -323,7 +320,7 @@ for kz = 1:1:size(n,3)-1
     
     phi(:,:,kz+1) = pb;
     
-    % Update progress bar
+    %% Update progress bar
     
     if strcmp(PROGRESS,'bar') == 1
     
