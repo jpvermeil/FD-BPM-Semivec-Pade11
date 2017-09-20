@@ -1,10 +1,10 @@
-function [Px,glob_adr_slgs,dim_xl,dim_yl] = FD_BPM_Pade11_Semivec_(n,lambda,n_eff_Px,alpha,solver_tol,xg,yg,dz,EXCITATION,POLARIZATION,FIELDCOMPONENTS,BC,ABSORBER,PROGRESS)
-% Semi vectorial wide angle Padé(1,1) finite difference BPM for TE/TM E-
+function [phi,globalAdrSlgs,dim_xl,dim_yl] = FDBPMPade11Semivec(n,lambda,neff,alpha,solverTolerance,xg,yg,dz,EXCITATION,POLARIZATION,FIELDCOMPONENTS,BC,ABSORBER,PROGRESS)
+% Semi vectorial wide angle PadÃ©(1,1) finite difference BPM for TE/TM E-
 % and/or H-fields in 3D structures.
 % 
 % SYNOPSIS
 %
-% FD_BPM_Pade11_Semivec_(n,lambda,n_eff_Px,alpha,solver_tol,xg,yg,dz,EXCITATION,POLARIZATION,FIELDCOMPONENTS,BC,ABSORBER,PROGRESS)
+% FDBPMPade11Semivec(n,lambda,n_eff_Phi_x,alpha,solver_tol,xg,yg,dz,EXCITATION,POLARIZATION,FIELDCOMPONENTS,BC,ABSORBER,PROGRESS)
 % 
 % VARIABLES
 %
@@ -33,10 +33,10 @@ function [Px,glob_adr_slgs,dim_xl,dim_yl] = FD_BPM_Pade11_Semivec_(n,lambda,n_ef
 %                               profile ni will have dimensions:
 %                               ((j-1)^nb_interpolation + 1) x ((k-1)^nb_interpolation + 1)
 %                               Note that this feature is not supported yet. This means, that no
-%                               other value than »0« is supported. 
+%                               other value than '0' is supported. 
 %           .mode               String value that can either be 'beta_z' or 'k_bar'.
 %                               beta_z will use propagation constant of calculated fundamental mode
-%                               k_bar will use those of wide angle Padé approximation
+%                               k_bar will use those of wide angle PadÃ© approximation
 %       (external)  
 %           .field              A field distribution can be provided at this point. Its size has to
 %                               match the defined grid sizes.
@@ -60,13 +60,13 @@ format long
 %% Definition of variables and constants
 
 beta_0 = 2*pi/lambda;
-beta_z = beta_0 * n_eff_Px;
-n_max = max(max(squeeze(n(:,:,1))));
-n_min = min(min(squeeze(n(:,:,1))));
+beta_z = beta_0 * neff;
+n_max = max(max(n(:,:,1)));
+n_min = min(min(n(:,:,1)));
 delta_n = n_max - n_min;                % refractive index contrast
 
 % Check field components input
-[FX,FY] = check_fieldcomponents_(FIELDCOMPONENTS);
+[FX,~] = checkFieldComponents(FIELDCOMPONENTS);
         
 %% BPM specific parameters
 
@@ -76,29 +76,29 @@ dim_x   = size(n,2); % Number of global elements in x direction
 dim_xl  = size(n,2) - 2; % Number of local elements in y direction (without the boundary of the structure)
 dim_yl  = size(n,1) - 2; % Number of local elements in x direction (without the boundary of the structure)
 
-Px = zeros(size(n,1),size(n,2),size(n,3));
+phi = zeros(size(n,1),size(n,2),size(n,3));
 
-dG.cl = zeros(size(n,1),size(n,2)); % Grid that speficies lokal element numbers
-dG.cl(2:end-1,2:end-1) = reshape(1:1:dim_xl*dim_yl',dim_yl,dim_xl);
+grid.localIndex = zeros(size(n,1),size(n,2)); % Grid that speficies lokal element numbers
+grid.localIndex(2:end-1,2:end-1) = reshape(1:1:dim_xl*dim_yl',dim_yl,dim_xl);
 
-dG.cg = zeros(size(n,1),size(n,2)); % Grid that speficies global element numbers
-dG.cg(1:end) = 1:1:length(dG.cg(1:end));
+grid.globalIndex = zeros(size(n,1),size(n,2)); % Grid that speficies global element numbers
+grid.globalIndex(1:end) = 1:1:length(grid.globalIndex(1:end));
 
-dG.f = zeros(size(n,1),size(n,2));  % Grid that flags boundary elements of the structure
-dG.f([1 end],[1:end 1:end]) = 1;
-dG.f([1:end 1:end],[1 end]) = 1;
+grid.boundaryFlag = zeros(size(n,1),size(n,2));  % Grid that flags boundary elements of the structure
+grid.boundaryFlag([1 end],[1:end 1:end]) = 1;
+grid.boundaryFlag([1:end 1:end],[1 end]) = 1;
 
-glob_adr_slgs   = dG.cg(2:end-1,2:end-1); % Vector for global adresses of all lokal elements
-glob_adr_slgs   = reshape(glob_adr_slgs,size(glob_adr_slgs,1)*size(glob_adr_slgs,2),1);
+globalIndexSlgs   = grid.globalIndex(2:end-1,2:end-1); % Vector for global adresses of all lokal elements
+globalAdrSlgs   = reshape(globalIndexSlgs,size(globalIndexSlgs,1)*size(globalIndexSlgs,2),1);
      
 %% Definition of initial fields depending on chosen excitation
 
-excitation = EXCITATION.fieldtype;
-visualize_excitation = EXCITATION.visualize;
+fieldtype = EXCITATION.type;
+VisualizeExcitation = EXCITATION.visualize;
 
 % Check for fieldtype 'gauss', 'full' or 'modal'
 
-if strcmp(excitation,'gauss') % Excitation with a gaussian beam
+if strcmp(fieldtype,'gauss') % Excitation with a gaussian beam
     
     sigma_x = EXCITATION.sigma_x; % sigma of gaussian distribution as measure for the extention of the gaussian beam in x-direction in [um]
     sigma_y = EXCITATION.sigma_y; % sigma of gaussian distribution as measure for the extention of the gaussian beam in y-direction in [um]
@@ -108,13 +108,13 @@ if strcmp(excitation,'gauss') % Excitation with a gaussian beam
         xg1 = squeeze(xg(:,:,1));
         yg1 = squeeze(yg(:,:,1));
 
-        [r_max,c_max] = find(squeeze(n(:,:,1)) == max(max(squeeze(n(:,:,1))))); % Those parameters assure, that the gaussian beam hits the profile at its maximum preventing mismatch
+        [r_max,c_max] = find(squeeze(n(:,:,1)) == max(max(n(:,:,1)))); % Those parameters assure, that the gaussian beam hits the profile at its maximum preventing mismatch
 
         xg1 = xg1 - xg1(r_max(1),c_max(1)); % x-grid for the definition of the gaussian beam
         yg1 = yg1 - yg1(r_max(1),c_max(1)); % y-grid for the definition of the gaussian beam
 
-        Px_a = 1*exp(-xg1.^2/(2*(sigma_x))^2 -yg1.^2/(2*(sigma_y))^2);  % Definition of gaussian beam
-        Px(:,:,1) = Px_a;                                               % Merging gaussian beam in global field matrix 
+        phiInput = 1*exp(-xg1.^2/(2*(sigma_x))^2 -yg1.^2/(2*(sigma_y))^2);  % Definition of gaussian beam
+        phi(:,:,1) = phiInput;                                               % Merging gaussian beam in global field matrix 
         
     else
        
@@ -124,7 +124,7 @@ if strcmp(excitation,'gauss') % Excitation with a gaussian beam
         
     end
     
-elseif strcmp(excitation,'full')        % Excitation with a constant illumination pattern
+elseif strcmp(fieldtype,'full')        % Excitation with a constant illumination pattern
     
     threshold = EXCITATION.threshold;   % threshold value determines how much of the waveguide's core is excited by full illuminating source. It determines how big the part of delta_n is which is illuminated.
     % Expample: threhold = 0.9; -> Maximum 90% of delta_n are illuminated
@@ -132,11 +132,11 @@ elseif strcmp(excitation,'full')        % Excitation with a constant illuminatio
     
     if isnumeric(threshold) && (threshold < 1) && (threshold > 0) 
         
-        n_threshold = min(min(squeeze(n(:,:,1)))) + delta_n * (1 - threshold);
-        Px_a = zeros(size(n,1),size(n,2));
-        Px_a(find(squeeze(n(:,:,1)) >= n_threshold)) = 1;   % Illuminating the part of delta_n that lies above the given threshold
+        nThreshold = min(min(n(:,:,1))) + delta_n * (1 - threshold);
+        phiInput = zeros(size(n,1),size(n,2));
+        phiInput(squeeze(n(:,:,1)) >= nThreshold) = 1;   % Illuminating the part of delta_n that lies above the given threshold
 
-        Px(:,:,1) = Px_a; % Merging illumination pattern in global field matrix 
+        phi(:,:,1) = phiInput; % Merging illumination pattern in global field matrix 
         
     else
         
@@ -146,30 +146,30 @@ elseif strcmp(excitation,'full')        % Excitation with a constant illuminatio
         
     end
 
-elseif strcmp(excitation,'modal') % Excitation with the fundamental mode
+elseif strcmp(fieldtype,'modal') % Excitation with the fundamental mode
     
-    nb_interpolation = EXCITATION.nb_interpolation;     % Specify number of interpolations of refractive index profile for the determination of propagation constants 
-    propagation_constant = EXCITATION.mode;             % Mode parameter determines if beta_z of the fundamental mode or k_bar of Padé approximation should be used for propagation
+    numberInterpolation = EXCITATION.numberInterpolation;     % Specify number of interpolations of refractive index profile for the determination of propagation constants 
+    propagationConstant = EXCITATION.mode;             % Mode parameter determines if beta_z of the fundamental mode or k_bar of PadÃ© approximation should be used for propagation
     
-    ni = interpn(squeeze(n(:,:,1)),nb_interpolation);   % This causes n with dimension j x k to be interpolated. Resulting profile ni will have dimensions ((j-1)^nb_interpolation + 1) x ((k-1)^nb_interpolation + 1)
+    nInterpolated = interpn(squeeze(n(:,:,1)),numberInterpolation);   % This causes n with dimension j x k to be interpolated. Resulting profile ni will have dimensions ((j-1)^numberInterpolation + 1) x ((k-1)^numberInterpolation + 1)
     
     % Calculate propagation constants of fundamental mode
 
-    [n_eff_pc_Px,Modenfeld_Px] = FD_propagationconstants_Semivec_(ni,beta_0,squeeze(xg(:,:,1)),squeeze(yg(:,:,1)),dim_y,dim_xl,dim_yl,dG.cg,dG.cl,POLARIZATION,FX,1); 
+    [neff_pc,modenfeld] = FDPropagationconstantsSemivec(nInterpolated,beta_0,squeeze(xg(:,:,1)),squeeze(yg(:,:,1)),dim_y,dim_xl,dim_yl,grid.globalIndex,grid.localIndex,POLARIZATION,FX,1); 
 
-    Px_a = zeros(size(ni,1),size(ni,2));
+    phiInput = zeros(size(nInterpolated,1),size(nInterpolated,2));
 
-    Px_a(2:end-1,2:end-1) = reshape(Modenfeld_Px(:,1),dim_yl,dim_xl);   % Reshaping modefield vector to match size of global field matrix
+    phiInput(2:end-1,2:end-1) = reshape(modenfeld(:,1),dim_yl,dim_xl);   % Reshaping modefield vector to match size of global field matrix
 
-    Px_a = Px_a/max(max(abs((Px_a))));
+    phiInput = phiInput/max(max(abs((phiInput))));
     
-    Px(:,:,1) = Px_a; % Merging mode field in global field matrix 
+    phi(:,:,1) = phiInput; % Merging mode field in global field matrix 
     
-    if strcmp(propagation_constant,'beta_z') % Use beta_z of calculated modefield for propagation
+    if strcmp(propagationConstant,'beta_z') % Use beta_z of calculated modefield for propagation
         
-        n_eff_Px = n_eff_pc_Px; 
+        neff = neff_pc; 
         
-    elseif ~strcmp(propagation_constant,'k_bar') % Use k_bar of Padé approximation for propagation
+    elseif ~strcmp(propagationConstant,'k_bar') % Use k_bar of PadÃ© approximation for propagation
         
         out = 'Invalid specification of excitation. Possible choices for EXCITATION.mode for modal propagation are: ''beta_z'' and ''k_bar''.';
         disp(out)
@@ -177,13 +177,13 @@ elseif strcmp(excitation,'modal') % Excitation with the fundamental mode
         
     end
     
-elseif strcmp(excitation,'external')
+elseif strcmp(fieldtype,'external')
     
     if isnumeric(EXCITATION.field) && size(EXCITATION.field,1) == size(n,1) && size(EXCITATION.field,2) == size(n,2)
     
-        Px_a = EXCITATION.field;
-        Px_a = Px_a/max(max(abs((Px_a))));
-        Px(:,:,1) = Px_a;
+        phiInput = EXCITATION.field;
+        phiInput = phiInput/max(max(abs((phiInput))));
+        phi(:,:,1) = phiInput;
         
     else
         
@@ -201,10 +201,10 @@ else
     
 end
 
-if visualize_excitation == 1 % Visualize excitation
+if VisualizeExcitation == 1 % Visualize excitation
     
     figure
-    surf(xg(:,:,1),yg(:,:,1),abs(Px(:,:,1)))
+    surf(xg(:,:,1),yg(:,:,1),abs(phi(:,:,1)))
     shading flat
     
 end
@@ -213,7 +213,7 @@ end
 
 if strcmp(BC,'ABC')
     
-    gamma_bc = 0;
+    gammaBoundaryCondition = 0;
     
 elseif strcmp(BC,'TBC')
     
@@ -235,14 +235,14 @@ end
 % distance. The are however explicitely depending on step size, alpha and
 % propagation constant.
 
-[ux,vx] = gen_multistep_vars_11_(dz,alpha,beta_z);  
+[UX,VX] = genMultistepVars11(dz,alpha,beta_z);  
 
 tic
 c = 1; % Global progress counter (waitbar)
 
 if strcmp(PROGRESS,'bar') == 1 
     
-    h = waitbar(0,'','Name',['Computing Padé ' POLARIZATION '-BPM with ' BC ' boundary condition...']);
+    h = waitbar(0,'','Name',['Computing PadÃ© ' POLARIZATION '-BPM with ' BC ' boundary condition...']);
 
 end
 
@@ -252,12 +252,12 @@ for kz = 1:1:size(n,3)-1
     
     % Extract known field values for current propagation step
     
-    Pbx = Px(:,:,kz);
+    pb = phi(:,:,kz);
  
     %% Call functions for calculation of diagonals
     
-    [ Cxx,Nxx,Sxx,Exx,Wxx ]      = diagonals_pade_(beta_0,n_eff_Px,n(:,:,kz+1),xg(:,:,kz+1),yg(:,:,kz+1),dim_y,dim_xl,dim_yl,dG,gamma_bc,POLARIZATION,FX,BC);
-    [ Cbxx,Nbxx,Sbxx,Ebxx,Wbxx ] = diagonals_pade_(beta_0,n_eff_Px,n(:,:,kz),xg(:,:,kz),yg(:,:,kz),dim_y,dim_xl,dim_yl,dG,gamma_bc,POLARIZATION,FX,BC);
+    [ diagC,diagN,diagS,diagE,diagW ]      = diagonalsPade(beta_0,neff,n(:,:,kz+1),xg(:,:,kz+1),yg(:,:,kz+1),dim_y,dim_xl,dim_yl,grid,gammaBoundaryCondition,POLARIZATION,FX,BC);
+    [ diagBC,diagBN,diagBS,diagBE,diagBW ] = diagonalsPade(beta_0,neff,n(:,:,kz),xg(:,:,kz),yg(:,:,kz),dim_y,dim_xl,dim_yl,grid,gammaBoundaryCondition,POLARIZATION,FX,BC);
     
     %% Apply multistep method
     
@@ -265,49 +265,49 @@ for kz = 1:1:size(n,3)-1
         
         % Paste diagonals in system matrix
         
-        Axx = sparse((size(n,1)-2)*(size(n,2)-2),(size(n,1)-2)*(size(n,2)-2));
-        Axx = spdiags(1 + vx(ii)*Cxx,0,Axx);
-        Axx = spdiags([vx(ii)*Nxx(2:end); 0],-1,Axx);
-        Axx = spdiags([0; vx(ii)*Sxx(1:end-1)],1,Axx);
-        Axx = spdiags([zeros(dim_yl,1); vx(ii)*Exx(1:end-dim_yl)],dim_yl,Axx);
-        Axx = spdiags([vx(ii)*Wxx(dim_yl+1:end); zeros(dim_yl,1)],-dim_yl,Axx);
+        A = sparse((size(n,1)-2)*(size(n,2)-2),(size(n,1)-2)*(size(n,2)-2));
+        A = spdiags(1 + VX(ii)*diagC,0,A);
+        A = spdiags([VX(ii)*diagN(2:end); 0],-1,A);
+        A = spdiags([0; VX(ii)*diagS(1:end-1)],1,A);
+        A = spdiags([zeros(dim_yl,1); VX(ii)*diagE(1:end-dim_yl)],dim_yl,A);
+        A = spdiags([VX(ii)*diagW(dim_yl+1:end); zeros(dim_yl,1)],-dim_yl,A);
         
         % Compute right side of equation
         
-        Cbxx = 1 + ux(ii)*Cbxx;
-        Nbxx = [ux(ii)*Nbxx(2:end); 0];
-        Sbxx = [0; ux(ii)*Sbxx(1:end-1)];
-        Ebxx = [zeros(dim_yl,1); ux(ii)*Ebxx(1:end-dim_yl)];
-        Wbxx = [ux(ii)*Wbxx(dim_yl+1:end); zeros(dim_yl,1)];
+        diagBC = 1 + UX(ii)*diagBC;
+        diagBN = [UX(ii)*diagBN(2:end); 0];
+        diagBS = [0; UX(ii)*diagBS(1:end-1)];
+        diagBE = [zeros(dim_yl,1); UX(ii)*diagBE(1:end-dim_yl)];
+        diagBW = [UX(ii)*diagBW(dim_yl+1:end); zeros(dim_yl,1)];
         
-        % Multiply right side with known field values at »kz«
+        % Multiply right side with known field values at 'kz'
         
-        Cbxx = Pbx(glob_adr_slgs)          .* Cbxx;
-        Nbxx = Pbx(glob_adr_slgs - 1)      .* Nbxx;
-        Sbxx = Pbx(glob_adr_slgs + 1)      .* Sbxx;
-        Ebxx = Pbx(glob_adr_slgs + dim_y)  .* Ebxx;
-        Wbxx = Pbx(glob_adr_slgs - dim_y)  .* Wbxx;
+        diagBC = pb(globalAdrSlgs)          .* diagBC;
+        diagBN = pb(globalAdrSlgs - 1)      .* diagBN;
+        diagBS = pb(globalAdrSlgs + 1)      .* diagBS;
+        diagBE = pb(globalAdrSlgs + dim_y)  .* diagBE;
+        diagBW = pb(globalAdrSlgs - dim_y)  .* diagBW;
         
         % Form vector for right side
         
-        bxx = sparse(Cbxx + Nbxx + Sbxx + Ebxx + Wbxx);
+        b = sparse(diagBC + diagBN + diagBS + diagBE + diagBW);
 
         %% Solve SoLE
         
-        [Px_l,~] = bicgstab(Axx,bxx,solver_tol);
+        [phiSolution,~] = bicgstab(A,b,solverTolerance);
        
         % Reshape solution to match field matrix
         
-        Pbx = zeros(dim_y,dim_x); 
-        Pbx(2:end-1,2:end-1) = reshape(Px_l,dim_yl,dim_xl);
+        pb = zeros(dim_y,dim_x); 
+        pb(2:end-1,2:end-1) = reshape(phiSolution,dim_yl,dim_xl);
         
         %% Apply absorber if specified
         
         if isnumeric(ABSORBER) && (ABSORBER > 0) && (ABSORBER < 1) && (ABSORBER ~= 0)
         
-            n_threshold             = n_min + delta_n * ABSORBER;
-            adr_n_threshold         = find(squeeze(n(:,:,kz)) <= n_threshold);
-            Pbx(adr_n_threshold)    = 0;
+            nThreshold             = n_min + delta_n * ABSORBER;
+            adr_n_threshold         = squeeze(n(:,:,kz)) <= nThreshold;
+            pb(adr_n_threshold)    = 0;
             
         elseif ~isnumeric(ABSORBER) || (ABSORBER < 0) || (ABSORBER > 1)
             
@@ -321,24 +321,24 @@ for kz = 1:1:size(n,3)-1
     
     %% Merge solution in global field matrix
     
-    Px(:,:,kz+1) = Pbx;
+    phi(:,:,kz+1) = pb;
     
     % Update progress bar
     
     if strcmp(PROGRESS,'bar') == 1
     
-        step_percent = 1;  % Defines step size for progress bar update
+        stepPercent = 1;  % Defines step size for progress bar update
 
-        if floor(100*kz/(size(n,3)-1)) > c*step_percent 
+        if floor(100*kz/(size(n,3)-1)) > c*stepPercent 
 
           if ishandle(h)    % Check if waitbar has not been closed to prevent error
 
-            minutes_passed      = floor(toc/60);
-            seconds_passed      = toc - minutes_passed*60;
-            minutes_remaining   = floor((toc/c)*((100/step_percent)-c)/60);
-            seconds_remaining   = (toc/c)*((100/step_percent)-c) - minutes_remaining*60;
+            minutesPassed      = floor(toc/60);
+            secondsPassed      = toc - minutesPassed*60;
+            minutesRemaining   = floor((toc/c)*((100/stepPercent)-c)/60);
+            secondsRemaining   = (toc/c)*((100/stepPercent)-c) - minutesRemaining*60;
 
-            waitbar(kz/(size(n,3)-1),h,['Progress: ' num2str(c*step_percent) '%. Time remaining: ' num2str(floor(minutes_remaining)) 'm ' num2str(ceil(seconds_remaining)) 's.']) 
+            waitbar(kz/(size(n,3)-1),h,['Progress: ' num2str(c*stepPercent) '%. Time remaining: ' num2str(floor(minutesRemaining)) 'm ' num2str(ceil(secondsRemaining)) 's.']) 
 
             c = c + 1;
 
@@ -352,16 +352,16 @@ for kz = 1:1:size(n,3)-1
    
     elseif strcmp(PROGRESS,'cl') == 1
         
-        step_percent = 10;  % Defines step size for progress bar update
+        stepPercent = 10;  % Defines step size for progress bar update
 
-        if floor(100*kz/(size(n,3)-1)) > c*step_percent 
+        if floor(100*kz/(size(n,3)-1)) > c*stepPercent 
 
-            minutes_passed      = floor(toc/60);
-            seconds_passed      = toc - minutes_passed*60;
-            minutes_remaining   = floor((toc/c)*((100/step_percent)-c)/60);
-            seconds_remaining   = (toc/c)*((100/step_percent)-c) - minutes_remaining*60;
+            minutesPassed      = floor(toc/60);
+            secondsPassed      = toc - minutesPassed*60;
+            minutesRemaining   = floor((toc/c)*((100/stepPercent)-c)/60);
+            secondsRemaining   = (toc/c)*((100/stepPercent)-c) - minutesRemaining*60;
 
-            out = ['   Progress: ' num2str(c*step_percent) '%. Time remaining: ' num2str(floor(minutes_remaining)) 'm ' num2str(ceil(seconds_remaining)) 's.'];
+            out = ['   Progress: ' num2str(c*stepPercent) '%. Time remaining: ' num2str(floor(minutesRemaining)) 'm ' num2str(ceil(secondsRemaining)) 's.'];
             disp(out)
 
             c = c + 1;
@@ -376,12 +376,12 @@ try
     close(h)
 end
 
-minutes_passed     = floor(toc/60);
-seconds_passed    = toc - minutes_passed*60;
+minutesPassed     = floor(toc/60);
+secondsPassed    = toc - minutesPassed*60;
 
 if strcmp(PROGRESS,'off') == 0
 
-    out = ['BPM-calculation finished after: ' num2str(minutes_passed) 'm ' num2str(seconds_passed) 's.'];
+    out = ['BPM-calculation finished after: ' num2str(minutesPassed) 'm ' num2str(secondsPassed) 's.'];
     disp(out);
     
 end
