@@ -55,10 +55,23 @@ function [phi,globalAdrSlgs,dim_xl,dim_yl] = FDBPMPade11Semivec(n,lambda,neff,al
 %                   'cl':   Command line (useful for batch mode)
 %                   'off':  No progress indicator (useful for step mode)
 
-format long
+% Semi vectorial wide angle Padé(1,1) finite difference BPM for TE/TM E-
+% and/or H-fields in 3D structures.
+% Copyright (C) 2017 Jan-Philipp Roth (JanPhilipp.Roth@gmail.com)
+% This program is free software; you can redistribute it and/or modify it
+% under the terms of the GNU General Public License as published by the
+% Free Software Foundation; either version 3 of the License, or (at your
+% option) any later version. This program is distributed in the hope that
+% it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+% warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+% GNU General Public License for more details. You should have received a
+% copy of the GNU General Public License along with this program; if not,
+% write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth
+% Floor, Boston, MA 02110-1301  USA
 
 %% Definition of variables and constants
 
+format long
 beta_0 = 2*pi/lambda;           % wave number
 beta_z = beta_0 * neff;         % propagation constant as defined by neff
 n_max = max(max(n(:,:,1)));     % maximum value of n
