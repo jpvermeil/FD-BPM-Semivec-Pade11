@@ -231,9 +231,7 @@ if strcmp(BC,'ABC')
 
 elseif strcmp(BC,'TBC')
 
-    out = 'Transparent boundary condition not yet supported. Please use absorbing boundary condition: ''ABC''.';
-    disp(out)
-    return
+    gammaBoundaryCondition = {};
 
 else
 
@@ -267,6 +265,78 @@ for kz = 1:1:size(n,3)-1
     % Extract known field values for current propagation step
 
     pb = phi(:,:,kz);
+
+    %% Boundary for TBC
+
+    if strcmp(BC,'TBC') == 1
+
+        % Define address vector of relevant boundary elements
+        kx = 2:1:size(n,2)-1;
+        ky = 2:1:size(n,1)-1;
+
+        % Initialize field coefficient according to correct direction (NSWE)
+        eta_N=zeros(1,size(n,2));
+        eta_S=zeros(1,size(n,2));
+        eta_W=zeros(size(n,1),1);
+        eta_E=zeros(size(n,1),1);
+
+        % Find those values of inner boundary element that is not zero.
+        % This avoides the division by zero when calculating eta quotient.
+        kx_N=find(pb(2,kx)~=0);
+        kx_S=find(pb(end-2,kx)~=0);
+        ky_W=find(pb(ky,2)~=0);
+        ky_E=find(pb(ky,end-2)~=0);
+
+        % Calculation of the wave numbers
+        eta_N(kx_N)=pb(3,kx_N+1)./pb(2,kx_N+1);
+        eta_S(kx_S)=pb(end-1,kx_S+1)./pb(end-2,kx_S+1);
+        eta_W(ky_W)=pb(ky_W+1,3)./pb(ky_W+1,2);
+        eta_E(ky_E)=pb(ky_E+1,end-1)./pb(ky_E+1,end-2);
+
+        % Wave number in x-direction
+        kW=zeros(dim_yl,1);
+        kW(ky_W)=1/(dx_fine.*1i)*log(eta_W(ky_W));
+        kE=zeros(dim_yl,1);
+        kE(ky_E)=-1/(dx_fine.*1i)*log(eta_E(ky_E));
+
+        % Wave number in y direction
+        kN=zeros(1,dim_xl);
+        kN(kx_N)=1/(dy_fine.*1i)*log(eta_N(kx_N));
+        kS=zeros(1,dim_xl);
+        kS(kx_S)=-1/(dy_fine.*1i)*log(eta_S(kx_S));
+
+        % Change sign of the real part of the wave number if necessary
+        W_korrekt=find(real(kW)<0);
+        kW_korrekt=kW(W_korrekt);
+        Real_kW_korrekt=real(kW_korrekt).*(-1);
+        Imag_kW=imag(kW_korrekt).*(i);
+        kW(W_korrekt)=Real_kW_korrekt+Imag_kW ;
+
+        E_korrekt=find(real(kE)<0);
+        kE_korrekt=kE(E_korrekt);
+        Real_kE_korrekt=real(kE_korrekt).*(-1);
+        Imag_kE=imag(kE_korrekt).*(i);
+        kE(E_korrekt)=Real_kE_korrekt+Imag_kE;
+
+        N_korrekt=find(real(kN)<0);
+        kN_korrekt=kN(N_korrekt);
+        Real_kN_korrekt=real(kN_korrekt).*(-1);
+        Imag_kN=imag(kN_korrekt).*(i);
+        kN(N_korrekt)=Real_kN_korrekt+Imag_kN;
+
+        S_korrekt=find(real(kS)<0);
+        kS_korrekt=kS(S_korrekt);
+        Real_kS_korrekt=real(kS_korrekt).*(-1);
+        Imag_kS=imag(kS_korrekt).*(i);
+        kS(S_korrekt)=Real_kS_korrekt+Imag_kS;
+
+        % phi0=phi1exp(-j*k*delta_x)
+        pb(ky,1)  =pb(ky,2).*exp(-1i*dx_fine.*kW);%W
+        pb(ky,end)=pb(ky,end-1).*exp(-1i*dx_fine.*kE);%E
+        pb(end,kx)=pb(end-1,kx).*exp(-1i*dy_fine.*kS);%S
+        pb(1,kx)  =pb(2,kx).*exp(-1i*dy_fine.*kN);%N
+
+    end
 
     %% Call functions for calculation of diagonals
 
