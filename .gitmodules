@@ -1,0 +1,3 @@
+[submodule "submodules/FD-Mode-Solver"]
+	path = submodules/FD-Mode-Solver
+	url = https://github.com/jpvermeil/FD-Mode-Solver
