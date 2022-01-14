@@ -219,6 +219,9 @@ if VisualizeExcitation == 1 % Visualize excitation
 
     figure
     surf(xg(:,:,1),yg(:,:,1),abs(phi(:,:,1)))
+    xlabel('x')
+    ylabel('y')
+    title('Exciting field distribution')
     shading flat
 
 end
