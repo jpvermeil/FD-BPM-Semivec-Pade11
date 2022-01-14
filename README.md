@@ -1,6 +1,6 @@
 Finite difference semi-vectorial wide-angle beam propagation algorithm for TE- and/or TM-Polarization of E- and/or H-fields in optical waveguide structures with arbitrary index profile. Calculation scheme is based on a semi-vectorial finite difference approach utilizing an absorbing boundary condition.
 
-To download official releases or rate the toolbox, please visit its page on FileExchange.
+To download official releases or rate the toolbox, please visit its page on [FileExchange](https://de.mathworks.com/matlabcentral/fileexchange/105225-fd-bpm-semivec-pade11).
 
 Theoretical Reference
 =======================
