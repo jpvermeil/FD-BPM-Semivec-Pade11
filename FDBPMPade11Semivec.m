@@ -182,6 +182,7 @@ elseif strcmp(fieldtype,'modal') % Excitation with the fundamental mode
     if strcmp(propagationConstant,'beta_z')     % Use beta_z of calculated modefield for propagation
 
         neff = neff_pc;
+        beta_z = beta_0 * neff;
 
     elseif ~strcmp(propagationConstant,'k_bar') % Use k_bar of Padé approximation for propagation
 
