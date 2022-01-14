@@ -107,7 +107,7 @@ out = ['  Prepending/appending done: ' num2str(toc) 's.'];
 disp(out)
 tic
 
-%% Anbringung eines Claddingmaterials oberhalb des Substratblocks
+%% Attaching upper cladding
     
 if upper_cladding == 1
     
